@@ -14,17 +14,21 @@ public class SocketServerRunnable implements Runnable {
 	private int socketPortNumber = 0;
 	private long sessionEndTime = 0L;
 	private long freshness = 0L;
+	private Object lock = null;
 
-	public SocketServerRunnable(long sessionEndTime) {
+	public SocketServerRunnable(long sessionEndTime, Object lock) {
+		this.lock = lock;
 		this.sessionEndTime = sessionEndTime;
 		socketPortNumber = Integer.parseInt(System.getProperty("socketPortNumber"));
+		synchronized (CoordinatorRunnable.freshness) {
+			this.freshness = CoordinatorRunnable.freshness.getTime();
+		}
 		try {
 			SocketServer = new ServerSocket(socketPortNumber);
 			socket = SocketServer.accept();
 			dataInputStream = new DataInputStream(socket.getInputStream());
 			dataOutputStream = new DataOutputStream(socket.getOutputStream());
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
@@ -32,18 +36,22 @@ public class SocketServerRunnable implements Runnable {
 
 	@Override
 	public void run() {
-		while (System.currentTimeMillis() > sessionEndTime) {
+		while (System.currentTimeMillis() < sessionEndTime) {
 			try {
-
-				synchronized (CoordinatorRunnable.freshness) {
-					while (freshness >= CoordinatorRunnable.freshness.getTime()) {
-						CoordinatorRunnable.freshness.wait();
+				System.out.println("Socket Runnable");
+				while (freshness == CoordinatorRunnable.freshness.getTime()) {
+					synchronized (lock) {
+						System.out.println("Waiting");
+						lock.wait();
+						System.out.println("After wait");
 					}
-					freshness = CoordinatorRunnable.freshness.getTime();
-					dataOutputStream.writeLong(freshness);
 				}
-				
+				System.out.println("No wait");
+				System.out.println("Freshness " + freshness);
+				freshness = CoordinatorRunnable.freshness.getTime();
+				dataOutputStream.writeLong(freshness);
 
+				// } catch (InterruptedException e) {
 			} catch (InterruptedException | IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

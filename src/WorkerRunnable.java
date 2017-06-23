@@ -42,10 +42,11 @@ public class WorkerRunnable implements Runnable, Config {
 	private BlockingQueue<Task> queue = null;
 	private Writer out = null;
 	private int threadID = 0;
+	private Object lock = null;
 
-	public WorkerRunnable(int threadID, BlockingQueue<Task> queue) {
+	public WorkerRunnable(int threadID, BlockingQueue<Task> queue, Object lock) {
 		this.queue = queue;
-
+		this.lock = lock;
 		String fileName = "chunk" + threadID;
 		try {
 			out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName, true), "UTF-8"));
@@ -84,22 +85,19 @@ public class WorkerRunnable implements Runnable, Config {
 					// write to a file
 					writeLocalFile(rs);
 
-					// get transaction id
-					Long taID = rs.getLong(9);
-
 					// get transaction commit timestamp from transaction id
 					Timestamp t = rs.getTimestamp(18);
 
 					// if commit timestamp is latest then update uptodate time
-					synchronized (CoordinatorRunnable.freshness) {
-
-						if (CoordinatorRunnable.freshness == null || CoordinatorRunnable.freshness.before(t)) {
-							CoordinatorRunnable.freshness = t;
-							CoordinatorRunnable.freshness.notify();
+					if (CoordinatorRunnable.freshness == null || CoordinatorRunnable.freshness.before(t)) {
+						CoordinatorRunnable.freshness = t;
+						synchronized (lock) {
+							lock.notifyAll();
 						}
 					}
 				}
-				System.out.println("Worker uptodatetime : " + CoordinatorRunnable.freshness.getTime());
+				// System.out.println("Worker uptodatetime : " +
+				// CoordinatorRunnable.freshness.getTime());
 
 			}
 

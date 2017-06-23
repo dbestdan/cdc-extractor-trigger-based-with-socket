@@ -16,17 +16,19 @@ public class Client {
 		System.out.println("run Duration ="+ runDuration);
 		BlockingQueue<Task> queue = new ArrayBlockingQueue<Task>(10000);
 		
+		final Object lock = new Object();
+		
 //		create a coordinator thread
 		CoordinatorRunnable coordinator = new CoordinatorRunnable(queue,sessionEndTime);
 		threads.add(new Thread(coordinator));
 		
 //		create a number of worker thread to read updates
 		for(int i=0; i<numThread; i++){
-			threads.add(new Thread(new WorkerRunnable(i, queue)));
+			threads.add(new Thread(new WorkerRunnable(i, queue,lock)));
 		}
 		
 		//create a socket thread
-		SocketServerRunnable uptodateSocketServerRunnable = new SocketServerRunnable(sessionEndTime);
+		SocketServerRunnable uptodateSocketServerRunnable = new SocketServerRunnable(sessionEndTime,lock);
 		threads.add(new Thread(uptodateSocketServerRunnable));
 		
 		
